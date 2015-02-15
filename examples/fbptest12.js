@@ -2,9 +2,9 @@ var fbp = require('..')
   , path = require('path');
 
 // --- define network ---
-var reader = fbp.defProc('./components/reader');
-var copier = fbp.defProc('./components/copier');
-var writer = fbp.defProc('./components/writer');
+var reader = fbp.defProc('reader');
+var copier = fbp.defProc('copier');
+var writer = fbp.defProc('writer');
 
 fbp.initialize(reader, 'FILE', path.resolve(__dirname, 'data/text.txt'));
 fbp.connect(reader, 'OUT', copier, 'IN', 1);

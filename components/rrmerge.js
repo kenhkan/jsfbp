@@ -1,11 +1,8 @@
 'use strict';
 
-var InputPortArray = require('../core/InputPortArray')
-  , OutputPort = require('../core/OutputPort');
-
-module.exports = function rrmerge() {
-  var array = InputPortArray.openInputPortArray('IN');
-  var outport = OutputPort.openOutputPort('OUT');
+module.exports = function rrmerge(proc) {
+  var array = proc.openInputPortArray('IN');
+  var outport = proc.openOutputPort('OUT');
   var ip = null;
   while (true) {
     for (var i = 0; i < array.length; i++) {

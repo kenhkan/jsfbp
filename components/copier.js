@@ -1,11 +1,8 @@
 'use strict';
 
-var InputPort = require('../core/InputPort')
-  , OutputPort = require('../core/OutputPort');
-
-module.exports = function copier() {
-  var inport = InputPort.openInputPort('IN');
-  var outport = OutputPort.openOutputPort('OUT');
+module.exports = function copier(proc) {
+  var inport = proc.openInputPort('IN');
+  var outport = proc.openOutputPort('OUT');
   while (true) {
     var ip = inport.receive();
     if (ip === null) {

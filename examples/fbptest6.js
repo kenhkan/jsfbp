@@ -1,10 +1,10 @@
 var fbp = require('..');
 
 // --- define network ---
-var sender  = fbp.defProc('./components/sender');
-var repl    = fbp.defProc('./components/repl.js');
-var rrmerge = fbp.defProc('./components/rrmerge');
-var recvr   = fbp.defProc('./components/recvr');
+var sender  = fbp.defProc('sender');
+var repl    = fbp.defProc('repl');
+var rrmerge = fbp.defProc('rrmerge');
+var recvr   = fbp.defProc('recvr');
 
 fbp.initialize(sender, 'COUNT', '20');
 fbp.connect(sender, 'OUT', repl, 'IN', 5);

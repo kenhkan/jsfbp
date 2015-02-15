@@ -1,12 +1,8 @@
 'use strict';
 
-var InputPort = require('../core/InputPort')
-  , IP = require('../core/IP')
-  , OutputPort = require('../core/OutputPort');
-
-module.exports = function copier_closing() {
-  var inport = InputPort.openInputPort('IN');
-  var outport = OutputPort.openOutputPort('OUT');
+module.exports = function copier_closing(proc) {
+  var inport = proc.openInputPort('IN');
+  var outport = proc.openOutputPort('OUT');
   var count = 0;
   while (true) {
     var ip = inport.receive();
@@ -16,7 +12,7 @@ module.exports = function copier_closing() {
     count++;
     if (count === 20) {
       inport.close();
-      IP.drop(ip);
+      proc.dropIP(ip);
       return;
     }
     var i = ip.contents;

@@ -2,10 +2,10 @@ var fbp = require('..')
   , path = require('path');
 
 // --- define network ---
-var sender = fbp.defProc('./components/sender.js');
-var reader = fbp.defProc('./components/reader.js');
-var copier = fbp.defProc('./components/copier.js');
-var recvr  = fbp.defProc('./components/recvr.js');
+var sender = fbp.defProc('sender');
+var reader = fbp.defProc('reader');
+var copier = fbp.defProc('copier');
+var recvr  = fbp.defProc('recvr');
 
 fbp.initialize(sender, 'COUNT', '20');
 fbp.connect(sender, 'OUT', copier, 'IN', 5);

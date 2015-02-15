@@ -1,20 +1,16 @@
 'use strict';
 
-var InputPort = require('../core/InputPort')
-  , IP = require('../core/IP')
-  , OutputPort = require('../core/OutputPort');
-
-module.exports = function reverse() {
-  var inport = InputPort.openInputPort('IN');
-  var outport = OutputPort.openOutputPort('OUT');
+module.exports = function reverse(proc) {
+  var inport = proc.openInputPort('IN');
+  var outport = proc.openOutputPort('OUT');
   while (true) {
     var ip = inport.receive();
     if (ip === null) {
       break;
     }
     var s = ip.contents;
-    outport.send(IP.create(StringReverse(s)));
-    IP.drop(ip);
+    outport.send(proc.createIP(StringReverse(s)));
+    proc.dropIP(ip);
   }
 };
 

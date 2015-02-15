@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-for file in ./fbptest*.js ; do
-  if [ -e "$file" ] ; then
-    echo "Running $file"
-    node "$file" > /dev/null
-  fi
+for (( i = 1; i < 12; i++ )); do
+  echo "fbptest$i.js"
+  node "examples/fbptest$i.js" > /dev/null
 done
