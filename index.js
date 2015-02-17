@@ -5,16 +5,15 @@
 // is by design as this encourages a tiny runtime.
 //
 // An added benefit is that we can share state between any part of the runtime
-// (the runtiem should be small anyway) for performance without sacrificing
-// privacy, that other modules can retrieve the internal state of the runtime
-// via `require()` since modularizing the runtime would force us to expose
-// internal details.
+// without sacrificing privacy such that other modules can retrieve the
+// internal state of the runtime via `require()` since modularizing the runtime
+// would force us to expose internal details.
 //
-// Note that this is written with performance in mind. Most design decisions
-// are made with browser optimization opportunities in mind. This style of
-// coding (mostly C-like) is not encouraged conventionally, but since this is
-// for just the runtime and all application-level code should be in components
-// and FBP anyway, this approach may be desirable.
+// Note that many design decisions are made with browser optimization
+// opportunities in mind. It does not necessarily mean that it is optimized.
+// This style of coding may not normally encouraged, but since this is for just
+// the (remember, small!) runtime and all application-level code should be in
+// components and FBP anyway, this approach may be desirable.
 //
 // In short, these are the design goals:
 //
@@ -23,19 +22,22 @@
 //     FBP network in JavaScript.
 //   * Cross-platform: the runtime should work, without modification, on
 //     Node.js/IO.js and in a modern browser environment.
-//   * Standard JavaScript: use ECMAScript 5 (will upgrade to 6 once its
-//     popularity eclipses 5).
-//   * Performance: we need an FBP runtime that can handle a large number of
-//     messages in a browser on a commodity machine.
+//   * ECMAScript 5: the runtime should be expected to run any FBP network
+//     without too much modifications due to platform changes (e.g. Node.js API
+//     changes).
+//   * When in doubt, use "simple" coding style (think imperative and
+//     functional).
 //
 // TODOs
 //
-//   * Capacity (at both port and system levels)
+//   * Back-pressure/Capacity
+//   * Explicit IP ownership (which would prevent the passed-by-reference
+//     object issue in JS)
 //   * Clean up IP and port states
 //   * Nuances between array ports and regular ports
-//   * Explicit IP ownership
-//   * Prevent objects in IPs to be modified, breaking the ownership rule
 //   * System-level traces
+//   * Multi-core support (cluster or child processes in Node.js and WebWorkers
+//     in browser)
 //   * Documentation
 
 
