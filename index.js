@@ -30,14 +30,16 @@
 //
 // TODOs
 //
-//   * Back-pressure/Capacity
-//   * Explicit IP ownership (which would prevent the passed-by-reference
-//     object issue in JS)
-//   * Clean up IP and port states
-//   * Nuances between array ports and regular ports
-//   * System-level traces
+//   * Back-pressure/Capacity -> Transactions and history
+//   * Explicit IP ownership (which would prevent the passd-by-reference
+//     object issue in JS) -> History (with global queue) and monadic interface
+//   * Synchronous coding style -> global error handling?
+//   * Clean up IP and port states -> Just refactoring
+//   * Nuances between array ports and regular ports -> Synchronous style of
+//     `while`?
+//   * System-level traces -> Option to turn off traces
 //   * Multi-core support (cluster or child processes in Node.js and WebWorkers
-//     in browser)
+//     in browser) -> Explicit components for each type of parallelism
 //   * Documentation
 
 
@@ -535,6 +537,7 @@ module.exports = {
   },
 
   run: function (config) {
+    config = config || {};
     enableTrace(config.trace);
     runLoop();
   },
