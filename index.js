@@ -12,7 +12,7 @@
 // Note that many design decisions are made with browser optimization
 // opportunities in mind. It does not necessarily mean that it is optimized.
 // This style of coding may not normally encouraged, but since this is for just
-// the (remember, small!) runtime and all application-level code should be in
+// the (remember, small!) runtime, and all application-level code should be in
 // components and FBP anyway, this approach may be desirable.
 //
 // In short, these are the design goals:
@@ -76,10 +76,10 @@ var global_acts_size = 1000;
 // Pointer to "current" activation
 var global_acts_head = 0;
 // Pointer to "last" activation. Note that the activation queue is conceptually
-// a proper list (just in a body of a fixed-sized array). The "last" queue
-// element is always assumed "nil" and ready to accept new allocation. When
-// this intersects with the head pointer, packets will be dropped, just like
-// when port fails to accept more IPs because of reaching capacity at the
+// a proper list (just in the body of a fixed-sized array). The "last" queue
+// element is always assumed "nil" and ready to be allocated. When this
+// intersects with the head pointer, packets will be rejected, just like when
+// port fails to accept more IPs because it has reached capacity at the
 // component-level.
 var global_acts_last = 0;
 
@@ -88,7 +88,9 @@ var global_acts_last = 0;
 var global_runLoopHasRun = false;
 // Depending on platform, we have different ways of inserting ourselves into
 // the event loop. We assume `global` to be `window` in a browser environment.
-var global_nextTick = global.requestAnimationFrame || global.process.nextTick;
+var global_nextTick =
+  (typeof window !== 'undefined') && window.requestAnimationFrame ||
+  global && global.process && global.process.nextTick;
 
 if (typeof global_nextTick !== 'function') {
   err('The platform on which this program is run provides no event loop.');
