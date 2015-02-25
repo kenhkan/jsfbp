@@ -31,6 +31,8 @@
 // TODOs
 //
 //   * Back-pressure/Capacity -> Transactions and history
+//   * Expose only a frozen PID and IPID property, for processes and IPs
+//     respectively.
 //   * Explicit IP ownership (which would prevent the passd-by-reference
 //     object issue in JS) -> History (with global queue) and monadic interface
 //   * Synchronous coding style -> global error handling?
@@ -60,9 +62,6 @@ function enableTrace (toTrace) {
 //
 // Note that in this implementation each newly sent IP necessarily equates a
 // new activation, regardless of whether the process would operate on the IP.
-// This is in line with FBP. Because of this guarantee, it also conveniently
-// allows the activation queue to be of a fixed size that is known before a
-// graph is run.
 //
 // Note that "acts" used in variable names throughout the runtime is simply a
 // contraction of "activations".
