@@ -30,11 +30,12 @@
 //
 // TODOs
 //
-//   * Back-pressure/Capacity -> Transactions and history
+//   * Semantics and programming interface
 //   * Expose only a frozen PID and IPID property, for processes and IPs
 //     respectively.
 //   * Explicit IP ownership (which would prevent the passd-by-reference
 //     object issue in JS) -> History (with global queue) and monadic interface
+//   * Back-pressure/Capacity -> Transactions and history
 //   * Synchronous coding style -> global error handling?
 //   * Clean up IP and port states -> Just refactoring
 //   * Nuances between array ports and regular ports -> Synchronous style of
