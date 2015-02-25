@@ -68,31 +68,68 @@ function enableTrace (toTrace) {
 
 // Simply an array of process functions that be activated
 var global_acts = [];
-// Maximum queue size. This is calculated by the cumulative capacity of the
-// graph when the graph is first run.
-// TODO: actually caculate the cumulative capcity
-var global_acts_size = 1000;
-// Pointer to "current" activation
+// Maximum queue size. A new connection increases this number. It starts at 1
+// because the queue is implemented as a proper list, so one space is reserved
+// for `nil`.
+var global_acts_size = 1;
+// Pointer to the "current" activation
 var global_acts_head = 0;
-// Pointer to "last" activation. Note that the activation queue is conceptually
-// a proper list (just in the body of a fixed-sized array). The "last" queue
-// element is always assumed "nil" and ready to be allocated. When this
-// intersects with the head pointer, packets will be rejected, just like when
-// port fails to accept more IPs because it has reached capacity at the
+// Pointer to the "last" activation. Note that the activation queue is
+// conceptually a proper list (just in the body of a fixed-sized array). The
+// "last" queue element is always assumed "nil" and ready to be allocated. When
+// this intersects with the head pointer, packets will be rejected, just like
+// when port fails to accept more IPs because it has reached capacity at the
 // component-level.
 var global_acts_last = 0;
 
-// The FBP run loop may be called more than once, BUT we only want it to run
-// once per event loop, specifically at the end of the current event loop.
-var global_runLoopHasRun = false;
-// Depending on platform, we have different ways of inserting ourselves into
-// the event loop. We assume `global` to be `window` in a browser environment.
-var global_nextTick =
-  (typeof window !== 'undefined') && window.requestAnimationFrame ||
-  global && global.process && global.process.nextTick;
+// Depending on the platform, we have different ways of inserting ourselves
+// into the event loop.
+var scheduleRun =
+  (typeof window === 'object') && window.requestAnimationFrame ||
+  (typeof global === 'object') && global.setImmediate;
 
-if (typeof global_nextTick !== 'function') {
+if (typeof scheduleRun !== 'function') {
   err('The platform on which this program is run provides no event loop.');
+}
+
+// We need some trackers to make sure only one loop is running as well as when
+// to terminate the infinite loop.
+var global_loopRunning = false;
+var global_lastHead = -1;
+
+// The design of the run-loop is specifically to avoid excessive interaction
+// with the browser, because it's generally expensive to do so. The run-loop is
+// executed at the *beginning* of the event loop, versus the end, in which case
+// all activations would have been settled before each event loop ends, but at
+// the expense of an engine-level call for each activation.
+function runLoop () {
+  // Guard against double running loops.
+  if (global_loopRunning) {
+    return;
+  }
+  global_loopRunning = true;
+
+  while (true) {
+    // The base case is when we've finally caught up with all the pending
+    // activations.
+    if (global_acts_last === global_acts_head) {
+      // We'll start the cycle anew on next event loop, but only when there has
+      // been activities.
+      if (global_lastHead !== global_acts_head) {
+        global_lastHead = global_acts_head;
+        scheduleRun(runLoop);
+      }
+      global_loopRunning = false;
+      return;
+    }
+
+    global_acts[global_acts_head]();
+
+    global_acts_head++;
+    if (global_acts_head >= global_acts_size) {
+      global_acts_head = 0;
+    }
+  }
 }
 
 
@@ -366,9 +403,11 @@ function send (pid, portName, ip, isIIP) {
     global_acts_last = 0;
   }
 
-  // Trigger the run loop.
-  global_runLoopHasRun = false;
-  global_nextTick(runLoop);
+  // Sending a message triggers the run-loop as it may process an event from
+  // the outside world.
+  if (! isIIP) {
+    runLoop();
+  }
 }
 
 function receive (pid, portName) {
@@ -417,30 +456,6 @@ function getPortBufferSizes (ports) {
   }
 
   return sizes;
-}
-
-function runLoop () {
-  // Avoid unnecessary execution.
-  if (global_runLoopHasRun) {
-    return;
-  }
-
-  // Flag the end of run loop.
-  global_runLoopHasRun = true;
-
-  while (true) {
-    // Base case is when we've finally caught up with all the activations.
-    if (global_acts_last === global_acts_head) {
-      return;
-    }
-
-    global_acts[global_acts_head]();
-
-    global_acts_head++;
-    if (global_acts_head >= global_acts_size) {
-      global_acts_head = 0;
-    }
-  }
 }
 
 function defProc (process, name) {
@@ -523,8 +538,9 @@ module.exports = {
     var address = toAddr(pid, portName);
     // Store the IIP for subsequent "receives".
     global_iipBuffer[address] = ip;
-    // Always send an initial packet to start things off.
-    send(pid, portName, 0, ip, true);
+    // Always send an initial packet to start things off, BUT these need to be
+    // sent after the graph has been kickstarted.
+    scheduleRun(send, pid, portName, ip, true);
   },
 
   connect: function (fromProc, fromPort, toProc, toPort, capacity) {
@@ -535,11 +551,16 @@ module.exports = {
     // Register the sub-port, if present.
     registerSubport(fromAddress);
     registerSubport(toAddress);
+
+    // Connecting adds to the global capacity.
+    global_acts_size += capacity;
   },
 
+  // `trace`: prints logs to stdout
   run: function (config) {
     config = config || {};
     enableTrace(config.trace);
+    // Run immediately.
     runLoop();
   },
 
