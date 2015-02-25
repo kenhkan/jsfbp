@@ -186,9 +186,37 @@ var global_arrayPort_sizes = {};
 // Convenience functions. These must be pure functions (using global variables
 // is ok) and are perfect candidates for inlining during compilation.
 
-function log (message) {
+function log () {
   if (global_toTrace) {
-    console.log(message);
+    console.log.apply(console, arguments);
+  }
+}
+
+function triLog (a, b, c, al, bl) {
+  if (global_toTrace) {
+    var i, l;
+    // Output string
+    var ao = '';
+    var bo = '';
+    // Default pad lengths
+    var al = al || 20;
+    var bl = bl || 3;
+
+    // Right-padded
+    l = al - a.length;
+    for (i = 0; i < l; i++) {
+      ao += ' ';
+    }
+    ao += a;
+
+    // Left-padded
+    l = bl - b.length;
+    bo += b;
+    for (i = 0; i < l; i++) {
+      bo += ' ';
+    }
+
+    log(ao, bo, c);
   }
 }
 
@@ -371,31 +399,32 @@ function send (pid, portName, ip, isIIP) {
     err('Invalid process with PID of ' + pid + ' and port of ' + portName);
   }
 
-  // If it's an IIP, just send directly to the specified port.
+  // We need to check the next one is not the head because the queue must be a
+  // proper list, so the next one needs to be "nil". This should theoretically
+  // never happen because IP sending is guarded at the port level.
+  if (global_acts_last + 1 === global_acts_head) {
+    err('Reached system capacity');
+  }
+
+  // If it's an IIP, just send directly to the specified port, but by default
+  // we're dealing with normal IPs.
   isIIP = isIIP || false;
-  var address;
+  var senderAddress = toAddr(pid, portName);
+  // Default to sender's own address
+  var address = senderAddress;
 
   // Get the destination address to send to.
-  if (isIIP) {
-    address = toAddr(pid, portName);
-  } else {
+  if (! isIIP) {
     address = mapAddr(pid, portName);
     // Activate the destination process.
     pid = getPID(address);
   }
 
-  // Drop to avoid overflow. We need to check the next one is not the head
-  // because the queue must be a proper list, so the next one needs to be
-  // "nil".
-  if (global_acts_last + 1 === global_acts_head) {
-    log('Reached system capacity. Dropping IP "' + ip.contents + '" sent to: ' + prettifyAddr(address));
-    return;
-  }
+  triLog(prettifyAddr(senderAddress), ' --> ', ip.contents);
 
   // Push IP to the destination buffer and an activation to the queue.
   (global_buffers[address] = global_buffers[address] || []).push(ip);
   global_acts[global_acts_last] = global_processes[pid];
-  log('Sending "' + ip.contents + '" to ' + prettifyAddr(address));
 
   // For the next IP
   global_acts_last++;
@@ -436,7 +465,7 @@ function receive (pid, portName) {
   }
 
   if (!! ip) {
-    log('Receiving "' + ip.contents + '" from ' + prettifyAddr(address));
+    triLog(prettifyAddr(address), ' <-- ', ip.contents);
   }
 
   return ip;
