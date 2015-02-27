@@ -624,8 +624,7 @@ function defProc (process, name) {
   // parameter as `proc` but it's actually the context here. The use of `proc`
   // as the parameter name is to make it more intuitive for users.
   var proc = function () {
-    // Pass the process context along with logging function
-    return process(context, log);
+    return process(context);
   };
 
   // Processes self-identify.
