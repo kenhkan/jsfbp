@@ -21,7 +21,7 @@
 //     file should be all you need to run an FBP network in JavaScript.
 //   * Cross-platform: the runtime should work, without modification, on
 //     Node.js/IO.js and in a modern browser environment.
-//   * ECMAScript 5: stable API
+//   * ECMAScript 5: a stable and familiar API
 //
 // TODOs
 //
