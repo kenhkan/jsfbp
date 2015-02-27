@@ -31,10 +31,7 @@
 // TODOs
 //
 //   * Back-pressure/Capacity -> Transactions and history
-//   * Synchronous coding style -> global error handling?
 //   * Port opening/closing
-//   * Nuances between array ports and regular ports -> Synchronous style of
-//     `while`?
 //   * Multi-core support (cluster or child processes in Node.js and WebWorkers
 //     in browser) -> Explicit components for each type of parallelism
 //   * Documentation
