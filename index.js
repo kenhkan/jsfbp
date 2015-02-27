@@ -25,6 +25,7 @@
 //
 // TODOs
 //
+//   * Separate IP and IIP into two queues
 //   * Back-pressure/Capacity -> Transactions and history
 //   * Port opening/closing
 //   * Multi-core support (cluster or child processes in Node.js and WebWorkers
@@ -463,10 +464,15 @@ function send (pid, portName, ip, isIIP) {
     }
   }
 
+  var global_acts_lastNext = global_acts_last + 1;
+  if (global_acts_lastNext >= global_acts_size) {
+    global_acts_lastNext = 0;
+  }
+
   // We need to check the next one is not the head because the queue must be a
   // proper list, so the next one needs to be "nil". This should theoretically
   // never happen because IP sending is guarded at the port level.
-  if (global_acts_last + 1 === global_acts_head) {
+  if (global_acts_lastNext === global_acts_head) {
     err('Reached system capacity');
   }
 
@@ -490,15 +496,11 @@ function send (pid, portName, ip, isIIP) {
   (global_buffers[address] = global_buffers[address] || []).push(ip);
   global_acts[global_acts_last] = pid;
 
-  // For the next IP
-  global_acts_last++;
-  if (global_acts_last >= global_acts_size) {
-    global_acts_last = 0;
-  }
-
-  // Sending a message triggers the run-loop as it may process an event from
-  // the outside world.
+  // For the next IP, but not IIP
+  global_acts_last = global_acts_lastNext;
   if (! isIIP) {
+    // Sending a message triggers the run-loop as it may process an event from
+    // the outside world.
     runLoop();
   }
 }
@@ -671,7 +673,7 @@ module.exports = {
     registerSubport(toAddress);
 
     // Connecting adds to the global capacity.
-    global_acts_size += capacity;
+    global_acts_size += capacity || 1;
   },
 
   // `trace`: prints logs to stdout
