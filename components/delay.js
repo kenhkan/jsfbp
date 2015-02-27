@@ -5,8 +5,6 @@ module.exports = function delay(proc) {
   var intvlport = proc.openInputPort('INTVL');
   var outport = proc.openOutputPort('OUT');
   var intvl_ip = intvlport.receive();
-  console.log('delay');
-  console.log(intvl_ip);
   var intvl = intvl_ip.content;
   proc.dropIP(intvl_ip);
 

@@ -6,7 +6,6 @@ module.exports = function sender(proc) {
   var ip = inport.receive();
   var count = ip.content;
   proc.dropIP(ip);
-  //console.log(count);
   for (var i = 0; i < count; i++) {
     var ip = proc.createIP(i + '');
     if (-1 == outport.send(ip)) {
