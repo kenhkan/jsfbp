@@ -1,6 +1,8 @@
 var fbp = require('..')
 , path = require('path');
 
+//fbp.enableTrace(true);
+
 // --- define network ---
 var reader0     = fbp.defProc('reader', 'reader0');
 var delay0      = fbp.defProc('delay', 'delay0');
