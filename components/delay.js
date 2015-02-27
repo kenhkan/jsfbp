@@ -10,7 +10,7 @@ module.exports = function delay(proc) {
   var intvl = intvl_ip.content;
   proc.dropIP(intvl_ip);
 
-  proc.looper(function (await, done) {
+  proc.loop(function (await, done) {
     var ip = inport.receive();
     if (ip === null) {
       done();
