@@ -30,10 +30,6 @@
 //
 // TODOs
 //
-//   * Expose only a frozen PID and IPID property, for processes and IPs
-//     respectively.
-//   * Explicit IP ownership (which would prevent the passd-by-reference
-//     object issue in JS) -> History (with global queue) and monadic interface
 //   * Back-pressure/Capacity -> Transactions and history
 //   * Synchronous coding style -> global error handling?
 //   * Port opening/closing
@@ -306,23 +302,19 @@ function deepCopy (data) {
 // ******
 // IP abstraction
 
-var global_IP_NORMAL = 0;
-var global_IP_OPEN   = 1;
-var global_IP_CLOSE  = 2;
-// Indexed by IPID
-var global_IP_owners   = [];
-var global_IP_statuses = [];
+// Who owns the IP? Indexed by IPID
+var global_ip_owners   = [];
 // We need to keep IPs because we're simply passing IPIDs around to satisfy
 // FBP's ownership requirements.
 var global_ips = [];
 // This is NOT the count of existing IPs, just a cumulative count of all IPs
 // that have been created since the system started.
-var global_IP_counter = 0;
+var global_ip_counter = 0;
 
 function createIP (pid, content) {
-  var ipid = global_IP_counter++;
+  var ipid = global_ip_counter++;
 
-  // IP is frozen to prevent ID tinkering.
+  // IP is frozen to prevent ID tempering.
   var ip = Object.freeze({
     id: ipid,
     // Creating a new IP always deep-copies.
@@ -330,14 +322,13 @@ function createIP (pid, content) {
   });
 
   // Book-keeping
-  global_IP_owners[ipid]   = pid;
-  global_IP_statuses[ipid] = global_IP_NORMAL;
+  global_ip_owners[ipid]   = pid;
 
   return ip;
 }
 
 function dropIP (pid, ipid) {
-  global_IP_statuses[ipid] = global_IP_CLOSE;
+  global_ip_owners[ipid] = null;
 }
 
 
@@ -470,6 +461,16 @@ function send (pid, portName, ip, isIIP) {
     err('Invalid process with PID of ' + pid + ' and port of ' + portName);
   }
 
+  var ipOwner = global_ip_owners[ip.id];
+
+  if (ipOwner !== pid) {
+    if (! ipOwner) {
+      err('The IP has been dropped and cannot be sent.');
+    } else {
+      err('The IP is owned by another process and cannot be sent.');
+    }
+  }
+
   // We need to check the next one is not the head because the queue must be a
   // proper list, so the next one needs to be "nil". This should theoretically
   // never happen because IP sending is guarded at the port level.
@@ -536,7 +537,7 @@ function receive (pid, portName) {
   var ipid = ip.id;
 
   // Receiving an IP transfers ownership.
-  global_IP_owners[ipid] = pid;
+  global_ip_owners[ipid] = pid;
 
   if (!! ipid) {
     triLog(prettifyAddr(address), ' <-- ', global_ips[ipid]);
