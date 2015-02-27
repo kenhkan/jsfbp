@@ -421,7 +421,7 @@ function openArrayPort (openPort, pid, name) {
 
 // Take a process ID and an iterator function and make sure it's "blocking",
 // making the process "sleep" until the `await` function is invoked.
-function looper (pid, iterator) {
+function loop (pid, iterator) {
   // The iterator is passed the await function.
   function iterate () {
     iterator(
@@ -434,7 +434,7 @@ function looper (pid, iterator) {
           scheduleRun(iterate);
         });
       },
-      // End the looper by releasing the process for future activations.
+      // End the loop by releasing the process for future activations.
       function done () {
         global_process_statuses[pid] = global_process_RUNNING;
         // There may be something that happened that would trigger activations.
@@ -620,8 +620,8 @@ function defProc (process, name) {
     // ***
     // Loopers, ES5-style
 
-    looper: function (iterator) {
-      looper(pid, iterator);
+    loop: function (iterator) {
+      loop(pid, iterator);
     }
   };
 
