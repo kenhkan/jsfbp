@@ -636,7 +636,8 @@ function defProc (process, name) {
   };
 
   // Processes self-identify.
-  proc.__fbpid = pid;
+  proc.id   = pid;
+  proc.name = processName;
   // Do not allow modifications.
   Object.freeze(proc);
   // Save the process.
