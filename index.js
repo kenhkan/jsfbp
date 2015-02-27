@@ -290,7 +290,7 @@ function deepCopy (data) {
   try {
     return JSON.parse(JSON.stringify(data));
   } catch (e) {
-    err('Deep copying fails. The passed object must be acyclic and do not contain function and file handle references.');
+    err('Deep copying fails. The provided object must be acyclic and must not contain functions and references.');
   }
 }
 
