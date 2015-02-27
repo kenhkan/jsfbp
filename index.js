@@ -25,7 +25,6 @@
 //
 // TODOs
 //
-//   * Separate IP and IIP into two queues
 //   * Back-pressure/Capacity -> Transactions and history
 //   * Port opening/closing
 //   * Multi-core support (cluster or child processes in Node.js and WebWorkers
@@ -226,6 +225,10 @@ function err (message) {
 // permutation is unique. Playing JavaScript's magical dynamical typing to its
 // advantage here (doesn't happen often).
 function toAddr (pid, portName) {
+  if (typeof pid !== 'number' && typeof portName === 'string') {
+    err('Invalid process with PID of ' + pid + ' and port of ' + portName);
+  }
+
   return pid + '.' + portName;
 }
 
@@ -449,11 +452,7 @@ function loop (pid, iterator) {
 // ******
 // The Core
 
-function send (pid, portName, ip, isIIP) {
-  if (typeof pid !== 'number' && typeof portName === 'string') {
-    err('Invalid process with PID of ' + pid + ' and port of ' + portName);
-  }
-
+function send (pid, portName, ip) {
   var ipOwner = global_ip_owners[ip.id];
 
   if (ipOwner !== pid) {
@@ -476,33 +475,24 @@ function send (pid, portName, ip, isIIP) {
     err('Reached system capacity');
   }
 
-  // If it's an IIP, just send directly to the specified port, but by default
-  // we're dealing with normal IPs.
-  isIIP = isIIP || false;
   var senderAddress = toAddr(pid, portName);
   // Default to sender's own address
   var address = senderAddress;
 
   // Get the destination address to send to.
-  if (! isIIP) {
-    address = mapAddr(pid, portName);
-    // Activate the destination process.
-    pid = getPID(address);
-  }
+  address = mapAddr(pid, portName);
+  // Activate the destination process.
+  pid = getPID(address);
 
   triLog(prettifyAddr(senderAddress), ' --> ', ip.contents);
 
   // Push IP to the destination buffer and an activation to the queue.
   (global_buffers[address] = global_buffers[address] || []).push(ip);
   global_acts[global_acts_last] = pid;
-
-  // For the next IP, but not IIP
   global_acts_last = global_acts_lastNext;
-  if (! isIIP) {
-    // Sending a message triggers the run-loop as it may process an event from
-    // the outside world.
-    runLoop();
-  }
+  // Sending a message triggers the run-loop as it may process an event from
+  // the outside world.
+  runLoop();
 }
 
 function receive (pid, portName) {
@@ -660,7 +650,9 @@ module.exports = {
     global_iipBuffer[address] = ip;
     // Always send an initial packet to start things off, BUT these need to be
     // sent after the graph has been kickstarted.
-    scheduleRun(send, pid, portName, ip, true);
+    var address = toAddr(pid, portName);
+    triLog(prettifyAddr(address), ' ==> ', ip.contents);
+    scheduleRun(global_processes[pid]);
   },
 
   connect: function (fromProc, fromPort, toProc, toPort, capacity) {
