@@ -17,16 +17,11 @@
 //
 // In short, these are the design goals:
 //
-//   * Stand-alone runtime with no dependency: aside from a "standard library"
-//     of commonly-used components, this file should be all you need to run an
-//     FBP network in JavaScript.
+//   * Stand-alone runtime with no dependency: aside from componentsm, this
+//     file should be all you need to run an FBP network in JavaScript.
 //   * Cross-platform: the runtime should work, without modification, on
 //     Node.js/IO.js and in a modern browser environment.
-//   * ECMAScript 5: the runtime should be expected to run any FBP network
-//     without too much modifications due to platform changes (e.g. Node.js API
-//     changes).
-//   * When in doubt, use "simple" coding style (think imperative and
-//     functional).
+//   * ECMAScript 5: stable API
 //
 // TODOs
 //
