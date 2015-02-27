@@ -412,7 +412,11 @@ function looper (pid, iterator) {
       // The callback from the awaiting function
       function await (awaitor) {
         // When the await is called, we simply continue the loop.
-        awaitor(iterate);
+        awaitor(function () {
+          // We want to prevent accidental stack overflow if the user code is
+          // actually synchronous.
+          scheduleRun(iterate);
+        });
       },
       // End the looper by releasing the process for future activations.
       function done () {
