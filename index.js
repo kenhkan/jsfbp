@@ -246,7 +246,7 @@ function getPID (addr) {
 function prettifyAddr (addr) {
   var parts = addr.split('.');
   var pid = parts.shift();
-  var pname = global_processes[pid]._jsfbp_pname;
+  var pname = global_process_contexts[pid].name;
   parts.unshift(pname);
   return parts.join('.');
 }
@@ -591,14 +591,18 @@ function defProc (process, name) {
   // parameter as `proc` but it's actually the context here. The use of `proc`
   // as the parameter name is to make it more intuitive for users.
   var proc = function () {
-    return process(context);
+    // Pass the process context along with logging function
+    return process(context, log);
   };
 
-  // Remember to record the process name.
-  proc._jsfbp_pname = processName;
-
-  // Save it
+  // Processes self-identify.
+  proc.__fbpid = pid;
+  // Do not allow modifications.
+  Object.freeze(proc);
+  // Save the process.
   global_processes[pid] = proc;
+  // Save the contexts.
+  global_process_contexts[pid] = context;
   // It's running now!
   global_process_statuses[pid] = global_process_RUNNING;
 
