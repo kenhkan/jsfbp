@@ -124,7 +124,11 @@ function runLoop () {
       return;
     }
 
-    global_acts[global_acts_head]();
+    var pid = global_acts[global_acts_head];
+    // Activate the process, but only if it's running.
+    if (global_process_statuses[pid] === global_process_RUNNING) {
+      global_processes[pid]();
+    }
 
     global_acts_head++;
     if (global_acts_head >= global_acts_size) {
@@ -393,6 +397,40 @@ function openArrayPort (openPort, pid, name) {
 
 
 // ******
+// Looper pattern
+
+var global_process_RUNNING  = 0;
+var global_process_PAUSED   = 1;
+var global_process_statuses = [];
+
+// Take a process ID and an iterator function and make sure it's "blocking",
+// making the process "sleep" until the `await` function is invoked.
+function looper (pid, iterator) {
+  // The iterator is passed the await function.
+  function iterate () {
+    iterator(
+      // The callback from the awaiting function
+      function await (awaitor) {
+        // When the await is called, we simply continue the loop.
+        awaitor(iterate);
+      },
+      // End the looper by releasing the process for future activations.
+      function done () {
+        global_process_statuses[pid] = global_process_RUNNING;
+        // There may be something that happened that would trigger activations.
+        runLoop();
+      }
+    );
+  }
+
+  // Pause the process!
+  global_process_statuses[pid] = global_process_PAUSED;
+  // Start iteration.
+  iterate();
+}
+
+
+// ******
 // The Core
 
 function send (pid, portName, ip, isIIP) {
@@ -425,7 +463,7 @@ function send (pid, portName, ip, isIIP) {
 
   // Push IP to the destination buffer and an activation to the queue.
   (global_buffers[address] = global_buffers[address] || []).push(ip);
-  global_acts[global_acts_last] = global_processes[pid];
+  global_acts[global_acts_last] = pid;
 
   // For the next IP
   global_acts_last++;
@@ -535,7 +573,14 @@ function defProc (process, name) {
     // IP-related
 
     createIP: createIP,
-    dropIP: dropIP
+    dropIP: dropIP,
+
+    // ***
+    // Loopers, ES5-style
+
+    looper: function (iterator) {
+      looper(pid, iterator);
+    }
   };
 
   // The currying. Note that by convention we name the component function's
@@ -550,6 +595,8 @@ function defProc (process, name) {
 
   // Save it
   global_processes[pid] = proc;
+  // It's running now!
+  global_process_statuses[pid] = global_process_RUNNING;
 
   // We don't pass functions around, just the PID for safety.
   return pid;

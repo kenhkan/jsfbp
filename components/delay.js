@@ -8,18 +8,18 @@ module.exports = function delay(proc) {
   var intvl = intvl_ip.contents;
   proc.dropIP(intvl_ip);
 
-  while (true) {
+  proc.looper(function (await, done) {
     var ip = inport.receive();
     if (ip === null) {
-      break;
+      done();
+      return;
     }
-    sleep(proc.name, intvl, ip, function (ip) {
-      outport.send(ip);
+    console.log('delay start sleep: ' + Math.round(intvl * 100) / 100 + ' msecs');
+    await(function (defer) {
+      setTimeout(function () {
+        outport.send(ip);
+        defer();
+      }, intvl);
     });
-  }
-} 
-
-function sleep(name, ms, ip, done) {
-  console.log(name + ' start sleep: ' + Math.round(ms * 100) / 100 + ' msecs');
-  setTimeout(function () { done(ip); }, ms);
+  });
 }
