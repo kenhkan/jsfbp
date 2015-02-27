@@ -30,17 +30,15 @@
 //
 // TODOs
 //
-//   * Semantics and programming interface
 //   * Expose only a frozen PID and IPID property, for processes and IPs
 //     respectively.
 //   * Explicit IP ownership (which would prevent the passd-by-reference
 //     object issue in JS) -> History (with global queue) and monadic interface
 //   * Back-pressure/Capacity -> Transactions and history
 //   * Synchronous coding style -> global error handling?
-//   * Clean up IP and port states -> Just refactoring
+//   * Port opening/closing
 //   * Nuances between array ports and regular ports -> Synchronous style of
 //     `while`?
-//   * System-level traces -> Option to turn off traces
 //   * Multi-core support (cluster or child processes in Node.js and WebWorkers
 //     in browser) -> Explicit components for each type of parallelism
 //   * Documentation
@@ -186,6 +184,12 @@ var global_ports = {};
 // architecture.
 var global_arrayPort_sizes = {};
 
+// Process-related global variables
+var global_process_RUNNING  = 0;
+var global_process_PAUSED   = 1;
+var global_process_contexts = [];
+var global_process_statuses = [];
+
 
 // ******
 // Convenience functions. These must be pure functions (using global variables
@@ -287,6 +291,17 @@ function registerSubport (address) {
   }
 }
 
+// This deep-copy assumes a JSONifiable object, meaning that it must be a
+// primitive or an acyclic object, without any references such as file handles
+// and functions.
+function deepCopy (data) {
+  try {
+    return JSON.parse(JSON.stringify(data));
+  } catch (e) {
+    err('Deep copying fails. The passed object must be acyclic and do not contain function and file handle references.');
+  }
+}
+
 
 // ******
 // IP abstraction
@@ -294,18 +309,35 @@ function registerSubport (address) {
 var global_IP_NORMAL = 0;
 var global_IP_OPEN   = 1;
 var global_IP_CLOSE  = 2;
+// Indexed by IPID
+var global_IP_owners   = [];
+var global_IP_statuses = [];
+// We need to keep IPs because we're simply passing IPIDs around to satisfy
+// FBP's ownership requirements.
+var global_ips = [];
+// This is NOT the count of existing IPs, just a cumulative count of all IPs
+// that have been created since the system started.
+var global_IP_counter = 0;
 
-function createIP (contents) {
-  return {
-    // TODO: what to do with ownership?
-    owner: null,
-    type: global_IP_NORMAL,
-    contents: contents
-  };
+function createIP (pid, content) {
+  var ipid = global_IP_counter++;
+
+  // IP is frozen to prevent ID tinkering.
+  var ip = Object.freeze({
+    id: ipid,
+    // Creating a new IP always deep-copies.
+    content: deepCopy(content)
+  });
+
+  // Book-keeping
+  global_IP_owners[ipid]   = pid;
+  global_IP_statuses[ipid] = global_IP_NORMAL;
+
+  return ip;
 }
 
-function dropIP (ip) {
-  ip.type = global_IP_CLOSE;
+function dropIP (pid, ipid) {
+  global_IP_statuses[ipid] = global_IP_CLOSE;
 }
 
 
@@ -399,10 +431,6 @@ function openArrayPort (openPort, pid, name) {
 // ******
 // Looper pattern
 
-var global_process_RUNNING  = 0;
-var global_process_PAUSED   = 1;
-var global_process_statuses = [];
-
 // Take a process ID and an iterator function and make sure it's "blocking",
 // making the process "sleep" until the `await` function is invoked.
 function looper (pid, iterator) {
@@ -493,22 +521,25 @@ function receive (pid, portName) {
   // Locate the buffer by address label.
   var buffer = global_buffers[address];
 
-  // If it's a regular port, return the next IP.
-  var ip = (buffer && buffer.length && buffer.shift()) ||
-  // If it's an IIP port, just return the IIP.
-  global_iipBuffer[address] ||
-  // There's nothing anywhere.
-  null;
+  var ip =
+    // If it's a regular port, return the next IP.
+    (buffer && buffer.length && buffer.shift()) ||
+    // If it's an IIP port, just return the IIP.
+    global_iipBuffer[address] ||
+    // There's nothing anywhere.
+    null;
 
-  // Make sure the port is open.
-  if (isPortClosed(address)) {
-    var contents = '"' + (ip && ip.contents || '') + '"';
-    log('Port ' + prettifyAddr(address) + ' is closed. Dropping IP ' + contents);
-    return null;
+  if (! ip) {
+    return ip;
   }
 
-  if (!! ip) {
-    triLog(prettifyAddr(address), ' <-- ', ip.contents);
+  var ipid = ip.id;
+
+  // Receiving an IP transfers ownership.
+  global_IP_owners[ipid] = pid;
+
+  if (!! ipid) {
+    triLog(prettifyAddr(address), ' <-- ', global_ips[ipid]);
   }
 
   return ip;
@@ -576,8 +607,17 @@ function defProc (process, name) {
     // ***
     // IP-related
 
-    createIP: createIP,
-    dropIP: dropIP,
+    createIP: function (content) {
+      return createIP(pid, content);
+    },
+
+    getIP: function (ipid) {
+      return getIP(pid, ipid);
+    },
+
+    dropIP: function (ipid) {
+      dropIP(pid, ipid);
+    },
 
     // ***
     // Loopers, ES5-style
@@ -618,8 +658,8 @@ module.exports = {
 
   defProc: defProc,
 
-  initialize: function (pid, portName, contents) {
-    var ip = createIP(contents);
+  initialize: function (pid, portName, content) {
+    var ip      = createIP(pid, content);
     var address = toAddr(pid, portName);
     // Store the IIP for subsequent "receives".
     global_iipBuffer[address] = ip;

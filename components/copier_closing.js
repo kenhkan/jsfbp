@@ -15,7 +15,7 @@ module.exports = function copier_closing(proc) {
       proc.dropIP(ip);
       return;
     }
-    var i = ip.contents;
+    var i = ip.content;
     outport.send(ip);
   }
 };

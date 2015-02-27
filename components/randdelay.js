@@ -5,7 +5,7 @@ module.exports = function randdelay(proc) {
   var intvlport = proc.openInputPort('INTVL');
   var outport = proc.openOutputPort('OUT');
   var intvl_ip = intvlport.receive();
-  var intvl = intvl_ip.contents;
+  var intvl = intvl_ip.content;
   proc.dropIP(intvl_ip);
 
   while (true) {

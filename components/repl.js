@@ -10,7 +10,7 @@ module.exports = function repl(proc) {
       break;
     }
     for (var i = 0; i < array.length; i++) {
-      array[i].send(proc.createIP(ip.contents));
+      array[i].send(proc.createIP(ip.content));
     }
     proc.dropIP(ip);
   }

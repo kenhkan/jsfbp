@@ -4,7 +4,7 @@ module.exports = function sender(proc) {
   var inport = proc.openInputPort('COUNT');
   var outport = proc.openOutputPort('OUT');
   var ip = inport.receive();
-  var count = ip.contents;
+  var count = ip.content;
   proc.dropIP(ip);
   //console.log(count);
   for (var i = 0; i < count; i++) {

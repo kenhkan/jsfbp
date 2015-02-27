@@ -6,6 +6,6 @@ module.exports = function copier_nonlooper(proc) {
   var inport = proc.openInputPort('IN');
   var outport = proc.openOutputPort('OUT');
   var ip = inport.receive();
-  var i = ip.contents;
+  var i = ip.content;
   outport.send(ip);
 };

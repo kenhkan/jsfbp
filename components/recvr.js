@@ -7,7 +7,9 @@ module.exports = function recvr(proc) {
     if (ip === null) {
       break;
     }
-    var data = ip.contents;
+    console.log('recvr');
+    console.log(ip);
+    var data = ip.content;
     console.log('data: ' + data);
     proc.dropIP(ip);
   }

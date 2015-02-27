@@ -8,7 +8,7 @@ module.exports = function reverse(proc) {
     if (ip === null) {
       break;
     }
-    var s = ip.contents;
+    var s = ip.content;
     outport.send(proc.createIP(StringReverse(s)));
     proc.dropIP(ip);
   }

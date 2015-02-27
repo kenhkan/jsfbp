@@ -6,7 +6,7 @@ module.exports = function writer(proc) {
    var inport = proc.openInputPort('FILE');
    var dataport = proc.openInputPort('IN');
    var ip = inport.receive();
-   var fname = ip.contents;
+   var fname = ip.content;
    proc.dropIP(ip);
    var string = '';
    while (true) {
@@ -14,7 +14,7 @@ module.exports = function writer(proc) {
       if (ip === null) {
         break;
       }
-      string += ip.contents + '\n';
+      string += ip.content + '\n';
       proc.dropIP(ip);
    }
    myWriteFile(fname, string, "utf8", proc, function () {

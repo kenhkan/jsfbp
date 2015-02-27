@@ -6,7 +6,8 @@ var fs = require('fs');
 module.exports = function reader(proc) {
   var inport = proc.openInputPort('FILE');
   var ip = inport.receive();
-  var fname = ip.contents;
+  var fname = ip.content;
+  console.log('reader:: ', ip, fname);
   proc.dropIP(ip);
 
   myReadFile(fname, "utf8", proc, function (data) {

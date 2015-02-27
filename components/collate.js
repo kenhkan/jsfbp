@@ -6,7 +6,7 @@ module.exports = function collate(proc) {
   var ctlfieldsP = ctlfields.receive();
   proc.dropIP(ctlfieldsP);
 
-  var fields = ctlfieldsP.contents.split(',').map(function(str) { return parseInt(str); });
+  var fields = ctlfieldsP.content.split(',').map(function(str) { return parseInt(str); });
   var totalFieldLength = fields.reduce(function(acc, n) { return acc + n; }, 0);
 
   var portCount = inportArray.length;
@@ -23,7 +23,7 @@ module.exports = function collate(proc) {
     var lowestKey = "\uffff";
     ips.forEach(function(ip, portIndex) {
       if (ip !== null) {
-        var key = ip.contents.substring(0, totalFieldLength);
+        var key = ip.content.substring(0, totalFieldLength);
         if (key < lowestKey) {
           lowestKey = key;
           lowestIndex = portIndex;
