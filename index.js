@@ -26,12 +26,13 @@
 //
 // TODOs
 //
-//   * Back-pressure/Capacity -> Transactions and history
+//   * Back-pressure/Capacity
 //   * Port opening/closing
 //   * Subnets (static and dynamic)
 //   * Documentation
-//   * Multi-core support (cluster or child processes in Node.js and WebWorkers
-//     in browser) -> Explicit components for each type of parallelism
+//   * Multi-core support (cluster or child processes in Node.js and web
+//     workers in browser) with explicit components for each type of
+//     parallelism
 
 
 // ******
