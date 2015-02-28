@@ -68,8 +68,8 @@
 // Directives
 
 'use strict';
-/* jshint browser: true, node: true, indent: 2, maxlen: 80, strict: true */
-/* global define: true */
+/*jslint browser: true, node: true, indent: 2, maxlen: 80, vars: true */
+/*global define: true */
 
 
 
@@ -347,6 +347,31 @@ function deepCopy(data) {
 
 
 // ******
+// IPs
+
+function createIP(pid, content) {
+  var ipid = global_ip_counter;
+  global_ip_counter += 1;
+
+  // IP is frozen to prevent ID tempering.
+  var ip = Object.freeze({
+    id: ipid,
+    // Creating a new IP always deep-copies.
+    content: deepCopy(content)
+  });
+
+  // Book-keeping
+  global_ip_owners[ipid]   = pid;
+
+  return ip;
+}
+
+function dropIP(ipid) {
+  global_ip_owners[ipid] = null;
+}
+
+
+// ******
 // The Core
 
 // The design of the run-loop is specifically to avoid excessive interaction
@@ -471,7 +496,7 @@ function receive(pid, portName) {
 
 // Sending IIPs is different from sending usual IPs because they are more
 // parameters than messages.
-function sendIIP (pid, portName, content) {
+function sendIIP(pid, portName, content) {
   var ip      = createIP(pid, content);
   var address = toAddr(pid, portName);
   // Store the IIP for subsequent "receives".
@@ -481,31 +506,6 @@ function sendIIP (pid, portName, content) {
   address = toAddr(pid, portName);
   triLog(prettifyAddr(address), ' ==> ', ip.contents);
   scheduleRun(global_processes[pid]);
-}
-
-
-// ******
-// IPs
-
-function createIP(pid, content) {
-  var ipid = global_ip_counter;
-  global_ip_counter += 1;
-
-  // IP is frozen to prevent ID tempering.
-  var ip = Object.freeze({
-    id: ipid,
-    // Creating a new IP always deep-copies.
-    content: deepCopy(content)
-  });
-
-  // Book-keeping
-  global_ip_owners[ipid]   = pid;
-
-  return ip;
-}
-
-function dropIP(ipid) {
-  global_ip_owners[ipid] = null;
 }
 
 
@@ -593,7 +593,7 @@ function openArrayPort(openPort, pid, name) {
   return ports;
 }
 
-function connectPorts (fromProc, fromPort, toProc, toPort, capacity) {
+function connectPorts(fromProc, fromPort, toProc, toPort, capacity) {
   var fromAddress = toAddr(fromProc, fromPort);
   var toAddress = toAddr(toProc, toPort);
   global_connections[fromAddress] = toAddress;
@@ -606,27 +606,21 @@ function connectPorts (fromProc, fromPort, toProc, toPort, capacity) {
   global_acts_size += capacity || 1;
 }
 
+// Given an array of addresses, return an array of current buffer size for each
+// address, preserving order.
+function getPortBufferSizes(ports) {
+  var i, l;
+  var sizes = [];
+  var buffer;
+  var address;
 
-// ******
-// Networks
+  for (i = 0, l = ports.length; i < l; i += 1) {
+    address = ports[i].address;
+    buffer = global_buffers[address] || [];
+    sizes[i] = buffer.length;
+  }
 
-function createNetwork () {
-  return {
-    defProc: defProc,
-    initialize: sendIIP,
-    connect: connectPorts,
-    run: runNetwork,
-    enableTrace: enableTrace,
-    getPortBufferSizes: getPortBufferSizes
-  };
-}
-
-// `trace`: prints logs to stdout
-function runNetwork(config) {
-  config = config || {};
-  enableTrace(config.trace);
-  // Run immediately.
-  runLoop();
+  return sizes;
 }
 
 
@@ -665,24 +659,8 @@ function loop(pid, iterator) {
 
 
 // ******
-// Miscellaneous
+// Processes
 
-// Given an array of addresses, return an array of current buffer size for each
-// address, preserving order.
-function getPortBufferSizes(ports) {
-  var i, l;
-  var sizes = [];
-  var buffer;
-  var address;
-
-  for (i = 0, l = ports.length; i < l; i += 1) {
-    address = ports[i].address;
-    buffer = global_buffers[address] || [];
-    sizes[i] = buffer.length;
-  }
-
-  return sizes;
-}
 
 function defProc(process, name) {
   if (typeof process === 'string') {
@@ -765,6 +743,29 @@ function defProc(process, name) {
 
   // We don't pass functions around, just the PID for safety.
   return pid;
+}
+
+
+// ******
+// Networks
+
+// `trace`: prints logs to stdout
+function runNetwork(config) {
+  config = config || {};
+  enableTrace(config.trace);
+  // Run immediately.
+  runLoop();
+}
+
+function createNetwork() {
+  return {
+    defProc: defProc,
+    initialize: sendIIP,
+    connect: connectPorts,
+    run: runNetwork,
+    enableTrace: enableTrace,
+    getPortBufferSizes: getPortBufferSizes
+  };
 }
 
 
