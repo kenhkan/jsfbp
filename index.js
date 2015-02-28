@@ -1,31 +1,60 @@
-'use strict';
+// The MIT License (MIT)
+//
+// Copyright (c) 2015 Kenneth Kan
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
 
-// ******
-// The runtime should be small and performant. Putting everything in one file
-// is by design as this encourages a tiny runtime.
+
+
+// The FBP runtime should be small, performant, and easy to setup, use, and
+// maintain.  Putting everything in one file is by design as this encourages a
+// tiny runtime.
 //
 // An added benefit is that we can share state between any part of the runtime
-// without sacrificing privacy such that other modules can retrieve the
-// internal state of the runtime via `require()` since modularizing the runtime
-// would force us to expose internal details.
+// without sacrificing privacy; i.e. other modules cannot retrieve the internal
+// state of the runtime via `require()` since modularizing the runtime would
+// force us to expose internal states via export.
 //
-// Note that many design decisions are made with browser optimization
-// opportunities in mind. It does not necessarily mean that it is optimized.
-// This style of coding may not normally encouraged, but since this is for just
-// the (remember, small!) runtime, and all application-level code should be in
-// components and FBP anyway, this approach may be desirable.
+// Note that many design decisions are made with JS engine performance
+// optimization opportunities in mind. It does not necessarily mean that this
+// runtime is optimized solely for performance. It only means that when we have
+// to choose a data structure or code style decision with reasonably similar
+// readability and maintainability, the one with a higher optimization
+// potential wins.
 //
-// In short, these are the design goals:
+// In short, there is one goal: a stand-alone runtime with no dependency that
+// is ECMAScript 5-compliant, because of these primary reasons:
 //
-//   * Stand-alone runtime with no dependency: aside from the required
-//     components, this file should be all you need to run an FBP network in
-//     JavaScript.
-//   * Cross-platform: the runtime should work, without modification, on
-//     Node.js/IO.js and in a modern browser environment.
-//   * ECMAScript 5: a stable and familiar API
+//   * Aside from the required components, this file should be all you need to
+//     run an FBP network in JavaScript, minimizing cognitive and maintenance
+//     overhead.
+//   * The runtime itself should work cross-platform in all modern
+//     environments, both in the browser and on the server with Node.js/IO.js,
+//     offloading setup work from the users.
+//   * At both the runtime level and the application level, there should not be
+//     any edge case that arises because of fundamental mismatches between
+//     JavaScript and FBP. Avoiding the use of libraries at the runtime level
+//     helps.
 //
-// TODOs
+// Pending features/milestones
 //
+//   * Networks
 //   * Back-pressure/Capacity
 //   * Port opening/closing
 //   * Subnets (static and dynamic)
@@ -35,18 +64,42 @@
 //     parallelism
 
 
+
+// =============================================================================
+// Directives
+
+'use strict';
+/* jshint browser: true, node: true, indent: 2, maxlen: 80, strict: true */
+
+
+
+// =============================================================================
+// Global State
+//
+// Variables not local to functions must be prepended with the `global_` prefix
+// to avoid scoping bugs.
+
+
 // ******
-// Trace for debugging
+// Logging
 
 var global_toTrace = false;
 
-function enableTrace (toTrace) {
-  global_toTrace = toTrace || global_toTrace;
-}
+
+// ******
+// Scheduling
+
+// Depending on the platform, we have different ways of inserting ourselves
+// into the event loop.
+var scheduleRun =
+  ((typeof window === 'object') && (window.requestAnimationFrame)) ||
+  ((typeof global === 'object') && (global.setImmediate));
 
 
 // ******
-// The runtime queue for process activation. Each sent IP triggers its
+// Process Activations
+//
+// The runtime queue is for process activations. Each sent IP triggers its
 // destination process to be queued for activation and we want to put as many
 // activations in a single event loop as possible.
 //
@@ -72,59 +125,10 @@ var global_acts_head = 0;
 // component-level.
 var global_acts_last = 0;
 
-// Depending on the platform, we have different ways of inserting ourselves
-// into the event loop.
-var scheduleRun =
-  (typeof window === 'object') && window.requestAnimationFrame ||
-  (typeof global === 'object') && global.setImmediate;
-
-if (typeof scheduleRun !== 'function') {
-  err('The platform on which this program is run provides no event loop.');
-}
-
 // We need some trackers to make sure only one loop is running as well as when
 // to terminate the infinite loop.
 var global_loopRunning = false;
 var global_lastHead = -1;
-
-// The design of the run-loop is specifically to avoid excessive interaction
-// with the browser, because it's generally expensive to do so. The run-loop is
-// executed at the *beginning* of the event loop, versus the end, in which case
-// all activations would have been settled before each event loop ends, but at
-// the expense of an engine-level call for each activation.
-function runLoop () {
-  // Guard against double running loops.
-  if (global_loopRunning) {
-    return;
-  }
-  global_loopRunning = true;
-
-  while (true) {
-    // The base case is when we've finally caught up with all the pending
-    // activations.
-    if (global_acts_last === global_acts_head) {
-      // We'll start the cycle anew on next event loop, but only when there has
-      // been activities.
-      if (global_lastHead !== global_acts_head) {
-        global_lastHead = global_acts_head;
-        scheduleRun(runLoop);
-      }
-      global_loopRunning = false;
-      return;
-    }
-
-    var pid = global_acts[global_acts_head];
-    // Activate the process, but only if it's running.
-    if (global_process_statuses[pid] === global_process_RUNNING) {
-      global_processes[pid]();
-    }
-
-    global_acts_head++;
-    if (global_acts_head >= global_acts_size) {
-      global_acts_head = 0;
-    }
-  }
-}
 
 
 // ******
@@ -183,28 +187,62 @@ var global_process_statuses = [];
 
 
 // ******
+// IPs
+
+// Who owns the IP? Indexed by IPID
+var global_ip_owners   = [];
+// We need to keep IPs because we're simply passing IPIDs around to satisfy
+// FBP's ownership requirements.
+var global_ips = [];
+// This is NOT the count of existing IPs, just a cumulative count of all IPs
+// that have been created since the system started.
+var global_ip_counter = 0;
+
+
+// ******
+// Ports
+
+var global_port_NORMAL = 0;
+var global_port_CLOSE  = 1;
+
+
+
+// =============================================================================
+// Operations
+
+
+// ******
+// Trace for debugging
+
+function enableTrace(toTrace) {
+  global_toTrace = toTrace || global_toTrace;
+}
+
+
+// ******
 // Convenience functions. These must be pure functions (using global variables
 // is ok) and are perfect candidates for inlining during compilation.
 
-function log () {
+function log() {
   if (global_toTrace) {
     console.log.apply(console, arguments);
   }
 }
 
-function triLog (a, b, c, al, bl) {
+function triLog(a, b, c, al, bl) {
+  var i, l;
+  // Output string
+  var ao = '';
+  var bo = '';
+
   if (global_toTrace) {
-    var i, l;
-    // Output string
-    var ao = '';
-    var bo = '';
     // Default pad lengths
-    var al = al || 20;
-    var bl = bl || 3;
+    al = al || 20;
+    bl = bl || 3;
 
     // Right-padded
     l = al - a.length;
-    for (i = 0; i < l; i++) {
+    for (i = 0; i < l; i += 1) {
       ao += ' ';
     }
     ao += a;
@@ -212,7 +250,7 @@ function triLog (a, b, c, al, bl) {
     // Left-padded
     l = bl - b.length;
     bo += b;
-    for (i = 0; i < l; i++) {
+    for (i = 0; i < l; i += 1) {
       bo += ' ';
     }
 
@@ -220,14 +258,14 @@ function triLog (a, b, c, al, bl) {
   }
 }
 
-function err (message) {
+function err(message) {
   throw new Error(message);
 }
 
 // The address is simply concatenated process ID and port name, as each
 // permutation is unique. Playing JavaScript's magical dynamical typing to its
 // advantage here (doesn't happen often).
-function toAddr (pid, portName) {
+function toAddr(pid, portName) {
   if (typeof pid !== 'number' && typeof portName === 'string') {
     err('Invalid process with PID of ' + pid + ' and port of ' + portName);
   }
@@ -236,27 +274,28 @@ function toAddr (pid, portName) {
 }
 
 // Extract the process ID from an address label.
-function getPID (addr) {
+function getPID(addr) {
   return addr.split('.')[0];
 }
 
 // An address is an internal representation. Call this function with an
 // internal address label for a user-friendly version.
-function prettifyAddr (addr) {
+function prettifyAddr(addr) {
   var parts = addr.split('.');
   var pid = parts.shift();
   var pname = global_process_contexts[pid].name;
+
   parts.unshift(pname);
   return parts.join('.');
 }
 
 // Given an out-port address, return the address of the in-port connected to
 // it downstream.
-function mapAddr (fromProc, fromPort) {
+function mapAddr(fromProc, fromPort) {
   var fromAddress = toAddr(fromProc, fromPort);
   var toAddress = global_connections[fromAddress] || null;
 
-  if (! toAddress) {
+  if (!toAddress) {
     log('Port ' + prettifyAddr(fromAddress) + ' is not connected to anything.');
   }
 
@@ -265,7 +304,7 @@ function mapAddr (fromProc, fromPort) {
 
 // Given an array-port address, register the sub-port. This assumes that '['
 // and ']' are reserved characters in naming for array ports.
-function registerSubport (address) {
+function registerSubport(address) {
   var subportName;
   // For readability
   var sizes = global_arrayPort_sizes;
@@ -279,7 +318,7 @@ function registerSubport (address) {
   // the ending char is after the starting char, so extract everything in
   // between.
   if (idxEnd > idxStart) {
-    subportName = parseInt(address.substring(idxStart + 1, idxEnd));
+    subportName = parseInt(address.substring(idxStart + 1, idxEnd), 10);
     // We want the subport with the highest index so when we iterate, we get
     // all the ports.
     sizes[addr] = Math.max(subportName, sizes[addr] || 0) + 1;
@@ -289,177 +328,65 @@ function registerSubport (address) {
 // This deep-copy assumes a JSONifiable object, meaning that it must be a
 // primitive or an acyclic object, without any references such as file handles
 // and functions.
-function deepCopy (data) {
+function deepCopy(data) {
   try {
     return JSON.parse(JSON.stringify(data));
   } catch (e) {
-    err('Deep copying fails. The provided object must be acyclic and must not contain functions and references.');
+    err('Deep copying fails. The object must be circular and must not ' +
+        'contain functions and references.');
   }
-}
-
-
-// ******
-// IP abstraction
-
-// Who owns the IP? Indexed by IPID
-var global_ip_owners   = [];
-// We need to keep IPs because we're simply passing IPIDs around to satisfy
-// FBP's ownership requirements.
-var global_ips = [];
-// This is NOT the count of existing IPs, just a cumulative count of all IPs
-// that have been created since the system started.
-var global_ip_counter = 0;
-
-function createIP (pid, content) {
-  var ipid = global_ip_counter++;
-
-  // IP is frozen to prevent ID tempering.
-  var ip = Object.freeze({
-    id: ipid,
-    // Creating a new IP always deep-copies.
-    content: deepCopy(content)
-  });
-
-  // Book-keeping
-  global_ip_owners[ipid]   = pid;
-
-  return ip;
-}
-
-function dropIP (pid, ipid) {
-  global_ip_owners[ipid] = null;
-}
-
-
-// ******
-// Port abstraction
-
-var global_port_NORMAL = 0;
-var global_port_CLOSE  = 1;
-
-function isPortClosed (address) {
-  return global_ports[address].isClosed();
-}
-
-function createPort (pid, name) {
-  var address = toAddr(pid, name);
-  var port = global_ports[address];
-
-  if (!! port) {
-    return port;
-  }
-
-  var state = global_port_NORMAL;
-
-  port = {
-    address: address,
-
-    close: function () {
-      state = global_port_CLOSE
-    },
-
-    isClosed: function () {
-      return state === global_port_CLOSE;
-    }
-  };
-
-  // Register the port.
-  global_ports[address] = port;
-
-  return port;
-}
-
-function openInputPort (pid, name) {
-  var address = toAddr(pid, name);
-  var port = global_ports[address];
-
-  if (!! port) {
-    return port;
-  }
-
-  var port = createPort(pid, name);
-
-  port.receive = function () {
-    return receive(pid, name);
-  }
-
-  return port;
-}
-
-function openOutputPort (pid, name) {
-  var address = toAddr(pid, name);
-  var port = global_ports[address];
-
-  if (!! port) {
-    return port;
-  }
-
-  var port = createPort(pid, name);
-
-  port.send = function (ip) {
-    send(pid, name, ip);
-  }
-
-  return port;
-}
-
-function openArrayPort (openPort, pid, name) {
-  var ports = [];
-  var addr = toAddr(pid, name);
-  var size = global_arrayPort_sizes[addr];
-  var subportName;
-
-  for (var i = 0; i < size; i++) {
-    subportName = name + '[' + i + ']';
-    ports.push(openPort(pid, subportName));
-  }
-
-  return ports;
-}
-
-
-// ******
-// Looper pattern
-
-// Take a process ID and an iterator function and make sure it's "blocking",
-// making the process "sleep" until the `await` function is invoked.
-function loop (pid, iterator) {
-  // The iterator is passed the await function.
-  function iterate () {
-    iterator(
-      // The callback from the awaiting function
-      function await (awaitor) {
-        // When the await is called, we simply continue the loop.
-        awaitor(function () {
-          // We want to prevent accidental stack overflow if the user code is
-          // actually synchronous.
-          scheduleRun(iterate);
-        });
-      },
-      // End the loop by releasing the process for future activations.
-      function done () {
-        global_process_statuses[pid] = global_process_RUNNING;
-        // There may be something that happened that would trigger activations.
-        runLoop();
-      }
-    );
-  }
-
-  // Pause the process!
-  global_process_statuses[pid] = global_process_PAUSED;
-  // Start iteration.
-  iterate();
 }
 
 
 // ******
 // The Core
 
-function send (pid, portName, ip) {
+// The design of the run-loop is specifically to avoid excessive interaction
+// with the browser, because it's generally expensive to do so. The run-loop is
+// executed at the *beginning* of the event loop, versus the end, in which case
+// all activations would have been settled before each event loop ends, but at
+// the expense of an engine-level call for each activation.
+function runLoop() {
+  var pid;
+
+  // Guard against double running loops.
+  if (global_loopRunning) {
+    return;
+  }
+  global_loopRunning = true;
+
+  while (true) {
+    // The base case is when we've finally caught up with all the pending
+    // activations.
+    if (global_acts_last === global_acts_head) {
+      // We'll start the cycle anew on next event loop, but only when there has
+      // been activities.
+      if (global_lastHead !== global_acts_head) {
+        global_lastHead = global_acts_head;
+        scheduleRun(runLoop);
+      }
+      global_loopRunning = false;
+      return;
+    }
+
+    pid = global_acts[global_acts_head];
+    // Activate the process, but only if it's running.
+    if (global_process_statuses[pid] === global_process_RUNNING) {
+      global_processes[pid]();
+    }
+
+    global_acts_head += 1;
+    if (global_acts_head >= global_acts_size) {
+      global_acts_head = 0;
+    }
+  }
+}
+
+function send(pid, portName, ip) {
   var ipOwner = global_ip_owners[ip.id];
 
   if (ipOwner !== pid) {
-    if (! ipOwner) {
+    if (!ipOwner) {
       err('The IP has been dropped and cannot be sent.');
     } else {
       err('The IP is owned by another process and cannot be sent.');
@@ -490,7 +417,9 @@ function send (pid, portName, ip) {
   triLog(prettifyAddr(senderAddress), ' --> ', ip.contents);
 
   // Push IP to the destination buffer and an activation to the queue.
-  (global_buffers[address] = global_buffers[address] || []).push(ip);
+  var buffer = global_buffers[address] || [];
+  global_buffers[address] = buffer;
+  buffer.push(ip);
   global_acts[global_acts_last] = pid;
   global_acts_last = global_acts_lastNext;
   // Sending a message triggers the run-loop as it may process an event from
@@ -498,12 +427,11 @@ function send (pid, portName, ip) {
   runLoop();
 }
 
-function receive (pid, portName) {
+function receive(pid, portName) {
   if (typeof pid !== 'number' && typeof portName === 'string') {
     err('Invalid process with PID of ' + pid + ' and port of ' + portName);
   }
 
-  var process = global_processes[pid];
   var address = toAddr(pid, portName);
 
   // Locate the buffer by address label.
@@ -517,7 +445,7 @@ function receive (pid, portName) {
     // There's nothing anywhere.
     null;
 
-  if (! ip) {
+  if (!ip) {
     return ip;
   }
 
@@ -526,21 +454,170 @@ function receive (pid, portName) {
   // Receiving an IP transfers ownership.
   global_ip_owners[ipid] = pid;
 
-  if (!! ipid) {
+  if (!!ipid) {
     triLog(prettifyAddr(address), ' <-- ', global_ips[ipid]);
   }
 
   return ip;
 }
 
+
+// ******
+// IPs
+
+function createIP(pid, content) {
+  var ipid = global_ip_counter;
+  global_ip_counter += 1;
+
+  // IP is frozen to prevent ID tempering.
+  var ip = Object.freeze({
+    id: ipid,
+    // Creating a new IP always deep-copies.
+    content: deepCopy(content)
+  });
+
+  // Book-keeping
+  global_ip_owners[ipid]   = pid;
+
+  return ip;
+}
+
+function dropIP(ipid) {
+  global_ip_owners[ipid] = null;
+}
+
+
+// ******
+// Ports
+
+function isPortClosed(address) {
+  return global_ports[address].isClosed();
+}
+
+function createPort(pid, name) {
+  var address = toAddr(pid, name);
+  var port = global_ports[address];
+
+  if (!!port) {
+    return port;
+  }
+
+  var state = global_port_NORMAL;
+
+  port = {
+    address: address,
+
+    close: function () {
+      state = global_port_CLOSE;
+    },
+
+    isClosed: function () {
+      return state === global_port_CLOSE;
+    }
+  };
+
+  // Register the port.
+  global_ports[address] = port;
+
+  return port;
+}
+
+function openInputPort(pid, name) {
+  var address = toAddr(pid, name);
+  var port = global_ports[address];
+
+  if (!!port) {
+    return port;
+  }
+
+  port = createPort(pid, name);
+
+  port.receive = function () {
+    return receive(pid, name);
+  };
+
+  return port;
+}
+
+function openOutputPort(pid, name) {
+  var address = toAddr(pid, name);
+  var port = global_ports[address];
+
+  if (!!port) {
+    return port;
+  }
+
+  port = createPort(pid, name);
+
+  port.send = function (ip) {
+    send(pid, name, ip);
+  };
+
+  return port;
+}
+
+function openArrayPort(openPort, pid, name) {
+  var i;
+  var ports = [];
+  var addr = toAddr(pid, name);
+  var size = global_arrayPort_sizes[addr];
+  var subportName;
+
+  for (i = 0; i < size; i += 1) {
+    subportName = name + '[' + i + ']';
+    ports.push(openPort(pid, subportName));
+  }
+
+  return ports;
+}
+
+
+// ******
+// Looper pattern
+
+// Take a process ID and an iterator function and make sure it's "blocking",
+// making the process "sleep" until the `await` function is invoked.
+function loop(pid, iterator) {
+  // The iterator is passed the await function.
+  function iterate() {
+    iterator(
+      // The callback from the awaiting function
+      function await(awaitor) {
+        // When the await is called, we simply continue the loop.
+        awaitor(function () {
+          // We want to prevent accidental stack overflow if the user code is
+          // actually synchronous.
+          scheduleRun(iterate);
+        });
+      },
+      // End the loop by releasing the process for future activations.
+      function done() {
+        global_process_statuses[pid] = global_process_RUNNING;
+        // There may be something that happened that would trigger activations.
+        runLoop();
+      }
+    );
+  }
+
+  // Pause the process!
+  global_process_statuses[pid] = global_process_PAUSED;
+  // Start iteration.
+  iterate();
+}
+
+
+// ******
+// Miscellaneous
+
 // Given an array of addresses, return an array of current buffer size for each
 // address, preserving order.
-function getPortBufferSizes (ports) {
+function getPortBufferSizes(ports) {
+  var i, l;
   var sizes = [];
   var buffer;
   var address;
 
-  for (var i = 0, l = ports.length; i < l; i++) {
+  for (i = 0, l = ports.length; i < l; i += 1) {
     address = ports[i].address;
     buffer = global_buffers[address] || [];
     sizes[i] = buffer.length;
@@ -549,12 +626,10 @@ function getPortBufferSizes (ports) {
   return sizes;
 }
 
-function defProc (process, name) {
-  if (typeof process === 'function') {
-    // Nothing needs to be done. We expect a function.
-  } else if (typeof process === 'string') {
+function defProc(process, name) {
+  if (typeof process === 'string') {
     process = require('./components/' + process + '.js');
-  } else {
+  } else if (typeof process !== 'function') {
     err('Process must be either a process function or a component name.');
   }
 
@@ -577,7 +652,7 @@ function defProc (process, name) {
     // Ports-related
 
     openInputPort: function (name) {
-      return openInputPort(pid, name)
+      return openInputPort(pid, name);
     },
 
     openInputPortArray: function (name) {
@@ -585,7 +660,7 @@ function defProc (process, name) {
     },
 
     openOutputPort: function (name) {
-      return openOutputPort(pid, name)
+      return openOutputPort(pid, name);
     },
 
     openOutputPortArray: function (name) {
@@ -599,12 +674,8 @@ function defProc (process, name) {
       return createIP(pid, content);
     },
 
-    getIP: function (ipid) {
-      return getIP(pid, ipid);
-    },
-
     dropIP: function (ipid) {
-      dropIP(pid, ipid);
+      dropIP(ipid);
     },
 
     // ***
@@ -639,8 +710,13 @@ function defProc (process, name) {
 }
 
 
-// ******
-// Expose the API
+// =============================================================================
+// The API
+
+// Prerequisite checks
+if (typeof scheduleRun !== 'function') {
+  err('The platform on which this program is run provides no event loop.');
+}
 
 module.exports = {
 
@@ -653,7 +729,7 @@ module.exports = {
     global_iipBuffer[address] = ip;
     // Always send an initial packet to start things off, BUT these need to be
     // sent after the graph has been kickstarted.
-    var address = toAddr(pid, portName);
+    address = toAddr(pid, portName);
     triLog(prettifyAddr(address), ' ==> ', ip.contents);
     scheduleRun(global_processes[pid]);
   },

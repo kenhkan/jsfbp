@@ -2,13 +2,13 @@ var fbp = require('..')
 , path = require('path');
 
 // --- define network ---
-var network = new fbp.Network();
+var network = fbp;
 
-var reader0     = network.defProc('./components/reader', 'reader0');
-var delay0      = network.defProc('./components/delay', 'delay0');
-var reader1     = network.defProc('./components/reader', 'reader1');
-var delay1      = network.defProc('./components/delay', 'delay1');
-var recvr       = network.defProc('./components/recvr');
+var reader0     = network.defProc('reader', 'reader0');
+var delay0      = network.defProc('delay', 'delay0');
+var reader1     = network.defProc('reader', 'reader1');
+var delay1      = network.defProc('delay', 'delay1');
+var recvr       = network.defProc('recvr');
 
 network.initialize(delay0, 'INTVL', '2000');   // 2000 msecs
 network.initialize(delay1, 'INTVL', '1000');   // 1000 msecs
@@ -20,5 +20,6 @@ network.connect(delay0, 'OUT', recvr, 'IN', 2);
 network.connect(delay1, 'OUT', recvr, 'IN', 2);
 
 // --- run ---
-var fiberRuntime = new fbp.FiberRuntime();
-network.run(fiberRuntime, { trace: false });
+//var fiberRuntime = new fbp.FiberRuntime();
+//network.run(fiberRuntime, { trace: false });
+network.run();
