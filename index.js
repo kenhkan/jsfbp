@@ -447,7 +447,7 @@ function send(pid, portName, ip) {
   // Activate the destination process.
   pid = getPID(address);
 
-  triLog(prettifyAddr(senderAddress), ' --> ', ip.contents);
+  triLog(prettifyAddr(senderAddress), ' --> ', ip.content);
 
   // Push IP to the destination buffer and an activation to the queue.
   var buffer = global_buffers[address] || [];
@@ -488,7 +488,7 @@ function receive(pid, portName) {
   global_ip_owners[ipid] = pid;
 
   if (!!ipid) {
-    triLog(prettifyAddr(address), ' <-- ', global_ips[ipid]);
+    triLog(prettifyAddr(address), ' <-- ', ip.content);
   }
 
   return ip;
@@ -504,7 +504,7 @@ function sendIIP(pid, portName, content) {
   // Always send an initial packet to start things off, BUT these need to be
   // sent after the graph has been kickstarted.
   address = toAddr(pid, portName);
-  triLog(prettifyAddr(address), ' ==> ', ip.contents);
+  triLog(prettifyAddr(address), ' ==> ', ip.content);
   scheduleRun(global_processes[pid]);
 }
 

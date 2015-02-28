@@ -22,4 +22,4 @@ network.connect(delay1, 'OUT', recvr, 'IN', 2);
 // --- run ---
 //var fiberRuntime = new fbp.FiberRuntime();
 //network.run(fiberRuntime, { trace: false });
-network.run();
+network.run({ trace: true });
