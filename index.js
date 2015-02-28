@@ -54,7 +54,6 @@
 //
 // Pending features/milestones
 //
-//   * Networks
 //   * Back-pressure/Capacity
 //   * Port opening/closing
 //   * Subnets (static and dynamic)
@@ -70,6 +69,7 @@
 
 'use strict';
 /* jshint browser: true, node: true, indent: 2, maxlen: 80, strict: true */
+/* global define: true */
 
 
 
@@ -78,6 +78,14 @@
 //
 // Variables not local to functions must be prepended with the `global_` prefix
 // to avoid scoping bugs.
+
+
+// ******
+// API
+//
+// See the bottom of this file for the definition.
+
+var global_apiFactory;
 
 
 // ******
@@ -109,7 +117,7 @@ var scheduleRun =
 // Note that "acts" used in variable names throughout the runtime is simply a
 // contraction of "activations".
 
-// Simply an array of process functions that be activated
+// Simply an array of process functions to be activated
 var global_acts = [];
 // Maximum queue size. A new connection increases this number. It starts at 1
 // because the queue is implemented as a proper list, so one space is reserved
@@ -461,6 +469,20 @@ function receive(pid, portName) {
   return ip;
 }
 
+// Sending IIPs is different from sending usual IPs because they are more
+// parameters than messages.
+function sendIIP (pid, portName, content) {
+  var ip      = createIP(pid, content);
+  var address = toAddr(pid, portName);
+  // Store the IIP for subsequent "receives".
+  global_iipBuffer[address] = ip;
+  // Always send an initial packet to start things off, BUT these need to be
+  // sent after the graph has been kickstarted.
+  address = toAddr(pid, portName);
+  triLog(prettifyAddr(address), ' ==> ', ip.contents);
+  scheduleRun(global_processes[pid]);
+}
+
 
 // ******
 // IPs
@@ -569,6 +591,42 @@ function openArrayPort(openPort, pid, name) {
   }
 
   return ports;
+}
+
+function connectPorts (fromProc, fromPort, toProc, toPort, capacity) {
+  var fromAddress = toAddr(fromProc, fromPort);
+  var toAddress = toAddr(toProc, toPort);
+  global_connections[fromAddress] = toAddress;
+
+  // Register the sub-port, if present.
+  registerSubport(fromAddress);
+  registerSubport(toAddress);
+
+  // Connecting adds to the global capacity.
+  global_acts_size += capacity || 1;
+}
+
+
+// ******
+// Networks
+
+function createNetwork () {
+  return {
+    defProc: defProc,
+    initialize: sendIIP,
+    connect: connectPorts,
+    run: runNetwork,
+    enableTrace: enableTrace,
+    getPortBufferSizes: getPortBufferSizes
+  };
+}
+
+// `trace`: prints logs to stdout
+function runNetwork(config) {
+  config = config || {};
+  enableTrace(config.trace);
+  // Run immediately.
+  runLoop();
 }
 
 
@@ -713,49 +771,23 @@ function defProc(process, name) {
 // =============================================================================
 // The API
 
-// Prerequisite checks
 if (typeof scheduleRun !== 'function') {
   err('The platform on which this program is run provides no event loop.');
 }
 
-module.exports = {
-
-  defProc: defProc,
-
-  initialize: function (pid, portName, content) {
-    var ip      = createIP(pid, content);
-    var address = toAddr(pid, portName);
-    // Store the IIP for subsequent "receives".
-    global_iipBuffer[address] = ip;
-    // Always send an initial packet to start things off, BUT these need to be
-    // sent after the graph has been kickstarted.
-    address = toAddr(pid, portName);
-    triLog(prettifyAddr(address), ' ==> ', ip.contents);
-    scheduleRun(global_processes[pid]);
-  },
-
-  connect: function (fromProc, fromPort, toProc, toPort, capacity) {
-    var fromAddress = toAddr(fromProc, fromPort);
-    var toAddress = toAddr(toProc, toPort);
-    global_connections[fromAddress] = toAddress;
-
-    // Register the sub-port, if present.
-    registerSubport(fromAddress);
-    registerSubport(toAddress);
-
-    // Connecting adds to the global capacity.
-    global_acts_size += capacity || 1;
-  },
-
-  // `trace`: prints logs to stdout
-  run: function (config) {
-    config = config || {};
-    enableTrace(config.trace);
-    // Run immediately.
-    runLoop();
-  },
-
-  enableTrace: enableTrace,
-  getPortBufferSizes: getPortBufferSizes
-
+global_apiFactory = function () {
+  return {
+    createNetwork: createNetwork
+  };
 };
+
+if (typeof define === 'function' && define.amd) {
+  define([], global_apiFactory);
+} else if (typeof exports === 'object') {
+  module.exports = global_apiFactory();
+} else if (typeof window === 'object') {
+  window.fbp = global_apiFactory();
+} else {
+  err('This platform does not adhere to AMD or CommonJS, and is not a' +
+      'browser.');
+}

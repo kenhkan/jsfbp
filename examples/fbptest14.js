@@ -2,7 +2,7 @@ var fbp = require('..')
 , path = require('path');
 
 // --- define network ---
-var network = fbp;
+var network = fbp.createNetwork();
 
 var reader0     = network.defProc('reader', 'reader0');
 var delay0      = network.defProc('delay', 'delay0');
