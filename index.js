@@ -17,8 +17,9 @@
 //
 // In short, these are the design goals:
 //
-//   * Stand-alone runtime with no dependency: aside from componentsm, this
-//     file should be all you need to run an FBP network in JavaScript.
+//   * Stand-alone runtime with no dependency: aside from the required
+//     components, this file should be all you need to run an FBP network in
+//     JavaScript.
 //   * Cross-platform: the runtime should work, without modification, on
 //     Node.js/IO.js and in a modern browser environment.
 //   * ECMAScript 5: a stable and familiar API
@@ -27,9 +28,10 @@
 //
 //   * Back-pressure/Capacity -> Transactions and history
 //   * Port opening/closing
+//   * Subnets (static and dynamic)
+//   * Documentation
 //   * Multi-core support (cluster or child processes in Node.js and WebWorkers
 //     in browser) -> Explicit components for each type of parallelism
-//   * Documentation
 
 
 // ******
